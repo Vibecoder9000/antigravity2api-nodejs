@@ -6,6 +6,7 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
@@ -21,6 +22,46 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # 检查是否是 binary-build 分支
+      - name: Check if binary build branch
+        id: check_branch
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/binary-build" ]] || [[ "${{ github.ref }}" == refs/heads/release/* ]]; then
+            echo "is_binary=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_binary=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 二进制构建：先编译再构建 Docker
+      - name: Setup Node.js (for binary build)
+        if: steps.check_branch.outputs.is_binary == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies (for binary build)
+        if: steps.check_branch.outputs.is_binary == 'true'
+        run: npm ci
+
+      - name: Build Linux binary
+        if: steps.check_branch.outputs.is_binary == 'true'
+        run: npm run build:linux
+
+      - name: List dist contents
+        if: steps.check_branch.outputs.is_binary == 'true'
+        run: |
+          echo "=== dist directory contents ==="
+          ls -la dist/
+          echo "=== bin directory ==="
+          ls -la dist/bin/ || echo "No bin directory"
+
+      - name: Set executable permissions
+        if: steps.check_branch.outputs.is_binary == 'true'
+        run: |
+          chmod +x dist/antigravity-linux-x64
+          chmod +x dist/bin/* || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -44,7 +85,22 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push
+      # 二进制构建使用 Dockerfile.binary
+      - name: Build and push (binary)
+        if: steps.check_branch.outputs.is_binary == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.binary
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 源码构建使用默认 Dockerfile
+      - name: Build and push (source)
+        if: steps.check_branch.outputs.is_binary != 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
