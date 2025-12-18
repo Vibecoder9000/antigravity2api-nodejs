@@ -7,6 +7,7 @@ import { generateRequestBody } from '../utils/utils.js';
 import logger from '../utils/logger.js';
 import config from '../config/config.js';
 import tokenManager from '../auth/token_manager.js';
+import quotaManager from '../auth/quota_manager.js';
 import adminRouter from '../routes/admin.js';
 import sdRouter from '../routes/sd.js';
 
@@ -15,20 +16,20 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// 工具函数：生成响应元数据
+// Utility function: Generate response metadata
 const createResponseMeta = () => ({
   id: `chatcmpl-${Date.now()}`,
   created: Math.floor(Date.now() / 1000)
 });
 
-// 工具函数：设置流式响应头
+// Utility function: Set streaming response headers
 const setStreamHeaders = (res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 };
 
-// 工具函数：构建流式数据块
+// Utility function: Build streaming data chunk
 const createStreamChunk = (id, created, model, delta, finish_reason = null) => ({
   id,
   object: 'chat.completion.chunk',
@@ -37,12 +38,12 @@ const createStreamChunk = (id, created, model, delta, finish_reason = null) => (
   choices: [{ index: 0, delta, finish_reason }]
 });
 
-// 工具函数：写入流式数据
+// Utility function: Write streaming data
 const writeStreamData = (res, data) => {
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 };
 
-// 工具函数：结束流式响应
+// Utility function: End streaming response
 const endStream = (res) => {
   res.write('data: [DONE]\n\n');
   res.end();
@@ -51,16 +52,16 @@ const endStream = (res) => {
 app.use(cors());
 app.use(express.json({ limit: config.security.maxRequestSize }));
 
-// 静态文件服务
+// Static file service
 app.use('/images', express.static(path.join(__dirname, '../../public/images')));
 app.use(express.static(path.join(__dirname, '../../public')));
 
-// 管理路由
+// Admin routes
 app.use('/admin', adminRouter);
 
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {
-    return res.status(413).json({ error: `请求体过大，最大支持 ${config.security.maxRequestSize}` });
+    return res.status(413).json({ error: `Request body too large, max supported ${config.security.maxRequestSize}` });
   }
   next(err);
 });
@@ -84,7 +85,7 @@ app.use((req, res, next) => {
       const authHeader = req.headers.authorization;
       const providedKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
       if (providedKey !== apiKey) {
-        logger.warn(`API Key 验证失败: ${req.method} ${req.path}`);
+        logger.warn(`API Key validation failed: ${req.method} ${req.path}`);
         return res.status(401).json({ error: 'Invalid API Key' });
       }
     }
@@ -97,7 +98,7 @@ app.get('/v1/models', async (req, res) => {
     const models = await getAvailableModels();
     res.json(models);
   } catch (error) {
-    logger.error('获取模型列表失败:', error.message);
+    logger.error('Failed to get model list:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -112,8 +113,12 @@ app.post('/v1/chat/completions', async (req, res) => {
     }
     const token = await tokenManager.getToken();
     if (!token) {
-      throw new Error('没有可用的token，请运行 npm run login 获取token');
+      throw new Error('No available token, please run npm run login to get a token');
     }
+    
+    // Record request for quota estimation
+    quotaManager.recordRequest(token.refresh_token, model);
+    
     const isImageModel = model.includes('-image');
     const requestBody = generateRequestBody(messages, model, params, tools, token);
     if (isImageModel) {
@@ -124,7 +129,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         // }
       }
       requestBody.requestType="image_gen";
-      //requestBody.request.systemInstruction.parts[0].text += "现在你作为绘画模型聚焦于帮助用户生成图片";
+      //requestBody.request.systemInstruction.parts[0].text += "Now you act as a painting model focused on helping users generate images";
       delete requestBody.request.systemInstruction;
       delete requestBody.request.tools;
       delete requestBody.request.toolConfig;
@@ -178,10 +183,10 @@ app.post('/v1/chat/completions', async (req, res) => {
       });
     }
   } catch (error) {
-    logger.error('生成响应失败:', error.message);
+    logger.error('Failed to generate response:', error.message);
     if (!res.headersSent) {
       const { id, created } = createResponseMeta();
-      const errorContent = `错误: ${error.message}`;
+      const errorContent = `Error: ${error.message}`;
       
       if (stream) {
         setStreamHeaders(res);
@@ -206,27 +211,27 @@ app.post('/v1/chat/completions', async (req, res) => {
 });
 
 const server = app.listen(config.server.port, config.server.host, () => {
-  logger.info(`服务器已启动: ${config.server.host}:${config.server.port}`);
+  logger.info(`Server started: ${config.server.host}:${config.server.port}`);
 });
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    logger.error(`端口 ${config.server.port} 已被占用`);
+    logger.error(`Port ${config.server.port} is already in use`);
     process.exit(1);
   } else if (error.code === 'EACCES') {
-    logger.error(`端口 ${config.server.port} 无权限访问`);
+    logger.error(`Port ${config.server.port} access denied`);
     process.exit(1);
   } else {
-    logger.error('服务器启动失败:', error.message);
+    logger.error('Server failed to start:', error.message);
     process.exit(1);
   }
 });
 
 const shutdown = () => {
-  logger.info('正在关闭服务器...');
+  logger.info('Shutting down server...');
   closeRequester();
   server.close(() => {
-    logger.info('服务器已关闭');
+    logger.info('Server closed');
     process.exit(0);
   });
   setTimeout(() => process.exit(0), 5000);

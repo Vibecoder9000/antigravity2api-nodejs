@@ -1,112 +1,112 @@
-# Antigravity to OpenAI API 代理服务
+# Antigravity to OpenAI API Proxy Service
 
-将 Google Antigravity API 转换为 OpenAI 兼容格式的代理服务，支持流式响应、工具调用和多账号管理。
+A proxy service that converts the Google Antigravity API into an OpenAI-compatible format, supporting streaming responses, tool calls, and multi-account management.
 
-## 功能特性
+## Features
 
-- ✅ OpenAI API 兼容格式
-- ✅ 流式和非流式响应
-- ✅ 工具调用（Function Calling）支持
-- ✅ 多账号自动轮换
-- ✅ Token 自动刷新
-- ✅ API Key 认证
-- ✅ 思维链（Thinking）输出
-- ✅ 图片输入支持（Base64 编码）
-- ✅ 图片生成支持（大/小香蕉 模型）
-- ✅ Pro 账号随机 ProjectId 支持
+- ✅ OpenAI API Compatible Format
+- ✅ Streaming and Non-Streaming Responses
+- ✅ Tool Calling (Function Calling) Support
+- ✅ Multi-Account Automatic Rotation
+- ✅ Token Automatic Refresh
+- ✅ API Key Authentication
+- ✅ Chain of Thought (Thinking) Output
+- ✅ Image Input Support (Base64 Encoding)
+- ✅ Image Generation Support (Big/Small Banana Models)
+- ✅ Pro Account Random ProjectId Support
 
-## 环境要求
+## Environment Requirements
 
 - Node.js >= 18.0.0
 
-## 快速开始
+## Quick Start
 
-### 1. 安装依赖
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. 配置环境变量
+### 2. Configure Environment Variables
 
-复制 `.env.example` 为 `.env` 并编辑配置：
+Copy `.env.example` to `.env` and edit the configuration:
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件配置必要参数：
+Edit the `.env` file to configure necessary parameters:
 
 ```env
-# 必填配置
+# Required Configuration
 API_KEY=sk-text
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=admin123
 JWT_SECRET=your-jwt-secret-key-change-this-in-production
 
-# 可选配置
+# Optional Configuration
 # PROXY=http://127.0.0.1:7897
-# SYSTEM_INSTRUCTION=你是聊天机器人
+# SYSTEM_INSTRUCTION=You are a chat robot
 # IMAGE_BASE_URL=http://your-domain.com
 ```
 
-### 3. 登录获取 Token
+### 3. Login to Get Token
 
 ```bash
 npm run login
 ```
 
-浏览器会自动打开 Google 授权页面，授权后 Token 会保存到 `data/accounts.json`。
+The browser will automatically open the Google authorization page. After authorization, the Token will be saved to `data/accounts.json`.
 
-### 4. 启动服务
+### 4. Start Service
 
 ```bash
 npm start
 ```
 
-服务将在 `http://localhost:8045` 启动。
+The service will start at `http://localhost:8045`.
 
-## Docker 部署
+## Docker Deployment
 
-### 使用 Docker Compose（推荐）
+### Using Docker Compose (Recommended)
 
-1. **配置环境变量**
+1. **Configure Environment Variables**
 
-创建 `.env` 文件：
+Create `.env` file:
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env` 文件配置必要参数。
+Edit the `.env` file to configure necessary parameters.
 
-2. **启动服务**
+2. **Start Service**
 
 ```bash
 docker-compose up -d
 ```
 
-3. **查看日志**
+3. **View Logs**
 
 ```bash
 docker-compose logs -f
 ```
 
-4. **停止服务**
+4. **Stop Service**
 
 ```bash
 docker-compose down
 ```
 
-### 使用 Docker
+### Using Docker
 
-1. **构建镜像**
+1. **Build Image**
 
 ```bash
 docker build -t antigravity2api .
 ```
 
-2. **运行容器**
+2. **Run Container**
 
 ```bash
 docker run -d \
@@ -124,145 +124,145 @@ docker run -d \
   antigravity2api
 ```
 
-3. **查看日志**
+3. **View Logs**
 
 ```bash
 docker logs -f antigravity2api
 ```
 
-### Docker 部署说明
+### Docker Deployment Instructions
 
-- 数据持久化：`data/` 目录挂载到容器，保存 Token 数据
-- 图片存储：`public/images/` 目录挂载到容器，保存生成的图片
-- 配置文件：`.env` 和 `config.json` 挂载到容器，支持热更新
-- 端口映射：默认映射 8045 端口，可根据需要修改
-- 自动重启：容器异常退出会自动重启
+- Data Persistence: `data/` directory is mounted to the container to save Token data.
+- Image Storage: `public/images/` directory is mounted to the container to save generated images.
+- Configuration Files: `.env` and `config.json` are mounted to the container, supporting hot updates.
+- Port Mapping: Default mapping is port 8045, modify as needed.
+- Automatic Restart: Container will automatically restart if it exits abnormally.
 
-## Zeabur 部署
+## Zeabur Deployment
 
-### 使用预构建镜像部署
+### Deploy Using Pre-built Image
 
-1. **创建服务**
+1. **Create Service**
 
-在 Zeabur 控制台创建新服务，使用以下镜像：
+Create a new service in the Zeabur console using the following image:
 
 ```
 ghcr.io/liuw1535/antigravity2api-nodejs
 ```
 
-2. **配置环境变量**
+2. **Configure Environment Variables**
 
-在服务设置中添加以下环境变量：
+Add the following environment variables in the service settings:
 
-| 环境变量 | 说明 | 示例值 |
+| Environment Variable | Description | Example Value |
 |--------|------|--------|
-| `API_KEY` | API 认证密钥 | `sk-your-api-key` |
-| `ADMIN_USERNAME` | 管理员用户名 | `admin` |
-| `ADMIN_PASSWORD` | 管理员密码 | `your-secure-password` |
-| `JWT_SECRET` | JWT 密钥 | `your-jwt-secret-key` |
-| `IMAGE_BASE_URL` | 图片服务基础 URL | `https://your-domain.zeabur.app` |
+| `API_KEY` | API Authentication Key | `sk-your-api-key` |
+| `ADMIN_USERNAME` | Administrator Username | `admin` |
+| `ADMIN_PASSWORD` | Administrator Password | `your-secure-password` |
+| `JWT_SECRET` | JWT Secret | `your-jwt-secret-key` |
+| `IMAGE_BASE_URL` | Image Service Base URL | `https://your-domain.zeabur.app` |
 
-可选环境变量：
-- `PROXY`：代理地址
-- `SYSTEM_INSTRUCTION`：系统提示词
+Optional Environment Variables:
+- `PROXY`: Proxy address
+- `SYSTEM_INSTRUCTION`: System prompt
 
-3. **配置持久化存储**
+3. **Configure Persistent Storage**
 
-在服务的「Volumes」设置中添加以下挂载点：
+Add the following mount points in the service's "Volumes" settings:
 
-| 挂载路径 | 说明 |
+| Mount Path | Description |
 |---------|------|
-| `/app/data` | Token 数据存储 |
-| `/app/public/images` | 生成的图片存储 |
+| `/app/data` | Token Data Storage |
+| `/app/public/images` | Generated Image Storage |
 
-⚠️ **重要提示**：
-- 只挂载 `/app/data` 和 `/app/public/images` 这两个目录
-- 不要挂载其他目录（如 `/app/.env`、`/app/config.json` 等），否则会导致必要配置文件被清空，项目无法启动
+⚠️ **Important Note**:
+- Only mount `/app/data` and `/app/public/images`.
+- Do not mount other directories (such as `/app/.env`, `/app/config.json`, etc.), otherwise necessary configuration files may be cleared and the project will fail to start.
 
-4. **绑定域名**
+4. **Bind Domain**
 
-在服务的「Networking」设置中绑定域名，然后将该域名设置到 `IMAGE_BASE_URL` 环境变量中。
+Bind a domain in the service's "Networking" settings, then set that domain to the `IMAGE_BASE_URL` environment variable.
 
-5. **启动服务**
+5. **Start Service**
 
-保存配置后，Zeabur 会自动拉取镜像并启动服务。访问绑定的域名即可使用。
+After saving the configuration, Zeabur will automatically pull the image and start the service. Access via the bound domain.
 
-### Zeabur 部署说明
+### Zeabur Deployment Instructions
 
-- 使用预构建的 Docker 镜像，无需手动构建
-- 通过环境变量配置所有必要参数
-- 持久化存储确保 Token 和图片数据不丢失
+- Use pre-built Docker image, no manual build required.
+- Configure all necessary parameters via environment variables.
+- Persistent storage ensures Token and image data are not lost.
 
-## Web 管理界面
+## Web Management Interface
 
-服务启动后，访问 `http://localhost:8045` 即可打开 Web 管理界面。
+After the service starts, visit `http://localhost:8045` to open the Web Management Interface.
 
-### 功能特性
+### Features
 
-- 🔐 **安全登录**：JWT Token 认证，保护管理接口
-- 📊 **实时统计**：显示总 Token 数、启用/禁用状态统计
-- ➕ **多种添加方式**：
-  - OAuth 授权登录（推荐）：自动完成 Google 授权流程
-  - 手动填入：直接输入 Access Token 和 Refresh Token
-- 🎯 **Token 管理**：
-  - 查看所有 Token 的详细信息（Access Token 后缀、Project ID、过期时间）
-  - 📊 查看模型额度：按类型分组显示（Claude/Gemini/其他），实时查看剩余额度和重置时间
-  - 一键启用/禁用 Token
-  - 删除无效 Token
-  - 实时刷新 Token 列表
-- ⚙️ **配置管理**：
-  - 在线编辑服务器配置（端口、监听地址）
-  - 调整默认参数（温度、Top P/K、最大 Token 数）
-  - 修改安全配置（API 密钥、请求大小限制）
-  - 配置代理、系统提示词等可选项
-  - 热重载配置（部分配置需重启生效）
+- 🔐 **Secure Login**: JWT Token authentication, protecting management interfaces.
+- 📊 **Real-time Statistics**: Display total Token count, enable/disable status statistics.
+- ➕ **Multiple Addition Methods**:
+  - OAuth Login (Recommended): Automatically complete Google authorization process.
+  - Manual Entry: Directly input Access Token and Refresh Token.
+- 🎯 **Token Management**:
+  - View detailed information of all Tokens (Access Token suffix, Project ID, expiration time).
+  - 📊 View model quotas: Grouped by type (Claude/Gemini/Others), real-time view of remaining quota and reset time.
+  - One-click Enable/Disable Token.
+  - Delete invalid Tokens.
+  - Real-time refresh of Token list.
+- ⚙️ **Configuration Management**:
+  - Online editing of server configuration (port, listening address).
+  - Adjust default parameters (temperature, Top P/K, max Tokens).
+  - Modify security configuration (API key, request size limit).
+  - Configure proxy, system prompt, and other optional settings.
+  - Hot reload configuration (some configurations require restart to take effect).
 
-### 使用流程
+### Usage Flow
 
-1. **登录系统**
-   - 使用 `.env` 中配置的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 登录
-   - 登录成功后会自动保存 JWT Token 到浏览器
+1. **Login to System**
+   - Login using `ADMIN_USERNAME` and `ADMIN_PASSWORD` configured in `.env`.
+   - After successful login, JWT Token will be automatically saved to the browser.
 
-2. **添加 Token**
-   - **OAuth 方式**（推荐）：
-     1. 点击「OAuth登录」按钮
-     2. 在弹窗中点击「打开授权页面」
-     3. 在新窗口完成 Google 授权
-     4. 复制浏览器地址栏的完整回调 URL
-     5. 粘贴到输入框并提交
-   - **手动方式**：
-     1. 点击「手动填入」按钮
-     2. 填写 Access Token、Refresh Token 和过期时间
-     3. 提交保存
+2. **Add Token**
+   - **OAuth Method** (Recommended):
+     1. Click "OAuth Login" button.
+     2. Click "Open Authorization Page" in the popup.
+     3. Complete Google authorization in the new window.
+     4. Copy the full callback URL from the browser address bar.
+     5. Paste into the input box and submit.
+   - **Manual Method**:
+     1. Click "Manual Entry" button.
+     2. Fill in Access Token, Refresh Token, and expiration time.
+     3. Submit to save.
 
-3. **管理 Token**
-   - 查看 Token 卡片显示的状态和信息
-   - 点击「📊 查看额度」按钮查看该账号的模型额度信息
-     - 自动按模型类型分组（Claude/Gemini/其他）
-     - 显示剩余额度百分比和进度条
-     - 显示额度重置时间（北京时间）
-     - 支持「立即刷新」强制更新额度数据
-   - 使用「启用/禁用」按钮控制 Token 状态
-   - 使用「删除」按钮移除无效 Token
-   - 点击「刷新」按钮更新列表
+3. **Manage Tokens**
+   - View status and information on Token cards.
+   - Click "📊 View Quota" button to view model quota information for that account.
+     - Automatically grouped by model type (Claude/Gemini/Others).
+     - Display remaining quota percentage and progress bar.
+     - Display quota reset time (Beijing Time).
+     - Support "Refresh Now" to force update quota data.
+   - Use "Enable/Disable" button to control Token status.
+   - Use "Delete" button to remove invalid Tokens.
+   - Click "Refresh" button to update the list.
 
-4. **修改配置**
-   - 切换到「设置」标签页
-   - 修改需要调整的配置项
-   - 点击「保存配置」按钮应用更改
-   - 注意：端口和监听地址修改需要重启服务
+4. **Modify Configuration**
+   - Switch to "Settings" tab.
+   - Modify configuration items as needed.
+   - Click "Save Configuration" button to apply changes.
+   - Note: Port and listening address modifications require service restart.
 
-### 界面预览
+### Interface Preview
 
-- **Token 管理页面**：卡片式展示所有 Token，支持快速操作
-- **设置页面**：分类展示所有配置项，支持在线编辑
-- **响应式设计**：支持桌面和移动设备访问
+- **Token Management Page**: Card-style display of all Tokens, supporting quick operations.
+- **Settings Page**: Categorized display of all configuration items, supporting online editing.
+- **Responsive Design**: Supports desktop and mobile access.
 
-## API 使用
+## API Usage
 
-服务提供 OpenAI 兼容的 API 接口，详细使用说明请查看 [API.md](API.md)。
+The service provides an OpenAI-compatible API interface. For detailed usage instructions, please see [API.md](API.md).
 
-### 快速测试
+### Quick Test
 
 ```bash
 curl http://localhost:8045/v1/chat/completions \
@@ -270,13 +270,13 @@ curl http://localhost:8045/v1/chat/completions \
   -H "Authorization: Bearer sk-text" \
   -d '{
     "model": "gemini-2.0-flash-exp",
-    "messages": [{"role": "user", "content": "你好"}]
+    "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```
 
-## 多账号管理
+## Multi-Account Management
 
-`data/accounts.json` 支持多个账号，服务会自动轮换使用：
+`data/accounts.json` supports multiple accounts, and the service will automatically rotate between them:
 
 ```json
 [
@@ -297,115 +297,115 @@ curl http://localhost:8045/v1/chat/completions \
 ]
 ```
 
-- `enable: false` 可禁用某个账号
-- Token 过期会自动刷新
-- 刷新失败（403）会自动禁用并切换下一个账号
+- `enable: false` can disable a specific account.
+- Tokens will automatically refresh upon expiration.
+- Refresh failure (403) will automatically disable the account and switch to the next one.
 
-## 配置说明
+## Configuration Description
 
-项目配置分为两部分：
+Project configuration is divided into two parts:
 
-### 1. config.json（基础配置）
+### 1. config.json (Basic Configuration)
 
-基础配置文件，包含服务器、API 和默认参数设置：
+Basic configuration file, including server, API, and default parameter settings:
 
 ```json
 {
   "server": {
-    "port": 8045,              // 服务端口
-    "host": "0.0.0.0",         // 监听地址
-    "maxRequestSize": "500mb"  // 最大请求体大小
+    "port": 8045,              // Service port
+    "host": "0.0.0.0",         // Listening address
+    "maxRequestSize": "500mb"  // Max request body size
   },
   "defaults": {
-    "temperature": 1,          // 默认温度参数
-    "topP": 0.85,              // 默认 top_p
-    "topK": 50,                // 默认 top_k
-    "maxTokens": 8096          // 默认最大 token 数
+    "temperature": 1,          // Default temperature
+    "topP": 0.85,              // Default top_p
+    "topK": 50,                // Default top_k
+    "maxTokens": 8096          // Default max tokens
   },
   "other": {
-    "timeout": 180000,         // 请求超时时间（毫秒）
-    "skipProjectIdFetch": true // 跳过 ProjectId 获取，直接随机生成
+    "timeout": 180000,         // Request timeout (ms)
+    "skipProjectIdFetch": true // Skip ProjectId fetch, generate randomly directly
   }
 }
 ```
 
-### 2. .env（敏感配置）
+### 2. .env (Sensitive Configuration)
 
-环境变量配置文件，包含敏感信息和可选配置：
+Environment variable configuration file, containing sensitive information and optional configurations:
 
-| 环境变量 | 说明 | 必填 |
+| Environment Variable | Description | Required |
 |--------|------|------|
-| `API_KEY` | API 认证密钥 | ✅ |
-| `ADMIN_USERNAME` | 管理员用户名 | ✅ |
-| `ADMIN_PASSWORD` | 管理员密码 | ✅ |
-| `JWT_SECRET` | JWT 密钥 | ✅ |
-| `PROXY` | 代理地址（如：http://127.0.0.1:7897） | ❌ |
-| `SYSTEM_INSTRUCTION` | 系统提示词 | ❌ |
-| `IMAGE_BASE_URL` | 图片服务基础 URL | ❌ |
+| `API_KEY` | API Authentication Key | ✅ |
+| `ADMIN_USERNAME` | Administrator Username | ✅ |
+| `ADMIN_PASSWORD` | Administrator Password | ✅ |
+| `JWT_SECRET` | JWT Secret | ✅ |
+| `PROXY` | Proxy Address (e.g., http://127.0.0.1:7897) | ❌ |
+| `SYSTEM_INSTRUCTION` | System Prompt | ❌ |
+| `IMAGE_BASE_URL` | Image Service Base URL | ❌ |
 
-完整配置示例请参考 `.env.example` 文件。
+For a complete configuration example, please refer to the `.env.example` file.
 
-## 开发命令
+## Development Commands
 
 ```bash
-# 启动服务
+# Start Service
 npm start
 
-# 开发模式（自动重启）
+# Development Mode (Auto Restart)
 npm run dev
 
-# 登录获取 Token
+# Login to Get Token
 npm run login
 ```
 
-## 项目结构
+## Project Structure
 
 ```
 .
 ├── data/
-│   └── accounts.json       # Token 存储（自动生成）
+│   └── accounts.json       # Token storage (auto-generated)
 ├── public/
-│   ├── index.html          # Web 管理界面
-│   ├── app.js              # 前端逻辑
-│   └── style.css           # 界面样式
+│   ├── index.html          # Web management interface
+│   ├── app.js              # Frontend logic
+│   └── style.css           # Interface styles
 ├── scripts/
-│   ├── oauth-server.js     # OAuth 登录服务
-│   └── refresh-tokens.js   # Token 刷新脚本
+│   ├── oauth-server.js     # OAuth login service
+│   └── refresh-tokens.js   # Token refresh script
 ├── src/
 │   ├── api/
-│   │   └── client.js       # API 调用逻辑
+│   │   └── client.js       # API call logic
 │   ├── auth/
-│   │   ├── jwt.js          # JWT 认证
-│   │   └── token_manager.js # Token 管理
+│   │   ├── jwt.js          # JWT authentication
+│   │   └── token_manager.js # Token management
 │   ├── routes/
-│   │   └── admin.js        # 管理接口路由
+│   │   └── admin.js        # Admin interface routes
 │   ├── bin/
-│   │   ├── antigravity_requester_android_arm64   # Android ARM64 TLS 请求器
-│   │   ├── antigravity_requester_linux_amd64     # Linux AMD64 TLS 请求器
-│   │   └── antigravity_requester_windows_amd64.exe # Windows AMD64 TLS 请求器
+│   │   ├── antigravity_requester_android_arm64   # Android ARM64 TLS requester
+│   │   ├── antigravity_requester_linux_amd64     # Linux AMD64 TLS requester
+│   │   └── antigravity_requester_windows_amd64.exe # Windows AMD64 TLS requester
 │   ├── config/
-│   │   └── config.js       # 配置加载
+│   │   └── config.js       # Configuration loading
 │   ├── server/
-│   │   └── index.js        # 主服务器
+│   │   └── index.js        # Main server
 │   ├── utils/
-│   │   ├── idGenerator.js  # ID 生成器
-│   │   ├── logger.js       # 日志模块
-│   │   └── utils.js        # 工具函数
-│   └── AntigravityRequester.js # TLS 指纹请求器封装
+│   │   ├── idGenerator.js  # ID generator
+│   │   ├── logger.js       # Logging module
+│   │   └── utils.js        # Utility functions
+│   └── AntigravityRequester.js # TLS fingerprint requester wrapper
 ├── test/
-│   ├── test-request.js     # 请求测试
-│   └── test-transform.js   # 转换测试
-├── .env                    # 环境变量配置（敏感信息）
-├── .env.example            # 环境变量配置示例
-├── config.json             # 基础配置文件
-└── package.json            # 项目配置
+│   ├── test-request.js     # Request test
+│   └── test-transform.js   # Transform test
+├── .env                    # Environment variable configuration (sensitive info)
+├── .env.example            # Environment variable configuration example
+├── config.json             # Basic configuration file
+└── package.json            # Project configuration
 ```
 
-## Pro 账号随机 ProjectId
+## Pro Account Random ProjectId
 
-对于 Pro 订阅账号，可以跳过 API 验证直接使用随机生成的 ProjectId：
+For Pro subscription accounts, you can skip API validation and use a randomly generated ProjectId directly:
 
-1. 在 `config.json` 文件中设置：
+1. Set in `config.json` file:
 ```json
 {
   "other": {
@@ -414,19 +414,19 @@ npm run login
 }
 ```
 
-2. 运行 `npm run login` 登录时会自动使用随机生成的 ProjectId
+2. When running `npm run login`, a randomly generated ProjectId will be automatically used.
 
-3. 已有账号也会在使用时自动生成随机 ProjectId
+3. Existing accounts will also automatically generate a random ProjectId when used.
 
-注意：此功能仅适用于 Pro 订阅账号。官方已修复免费账号使用随机 ProjectId 的漏洞。
+Note: This feature is only applicable to Pro subscription accounts. The official has fixed the vulnerability where free accounts could use random ProjectIds.
 
-## 注意事项
+## Precautions
 
-1. 首次使用需要复制 `.env.example` 为 `.env` 并配置
-2. 运行 `npm run login` 获取 Token
-3. `.env` 和 `data/accounts.json` 包含敏感信息，请勿泄露
-4. 支持多账号轮换，提高可用性
-5. Token 会自动刷新，无需手动维护
+1. For first-time use, copy `.env.example` to `.env` and configure it.
+2. Run `npm run login` to get Token.
+3. `.env` and `data/accounts.json` contain sensitive information, do not leak.
+4. Initializes multi-account rotation to improve availability.
+5. Token refreshes automatically, no manual maintenance needed.
 
 ## License
 
