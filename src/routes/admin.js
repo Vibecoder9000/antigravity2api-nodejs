@@ -1,13 +1,13 @@
 import express from 'express';
+import fs from 'fs';
 import { generateToken, authMiddleware } from '../auth/jwt.js';
 import tokenManager from '../auth/token_manager.js';
 import quotaManager from '../auth/quota_manager.js';
+import oauthManager from '../auth/oauth_manager.js';
 import config, { getConfigJson, saveConfigJson } from '../config/config.js';
 import logger from '../utils/logger.js';
-import { generateProjectId } from '../utils/idGenerator.js';
 import { parseEnvFile, updateEnvFile } from '../utils/envParser.js';
 import { reloadConfig } from '../utils/configReloader.js';
-import { OAUTH_CONFIG } from '../constants/oauth.js';
 import { deepMerge } from '../utils/deepMerge.js';
 import { getModelsWithQuotas } from '../api/client.js';
 import path from 'path';
@@ -16,7 +16,33 @@ import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const envPath = path.join(__dirname, '../../.env');
+
+// 检测是否在 pkg 打包环境中运行
+const isPkg = typeof process.pkg !== 'undefined';
+
+// 获取 .env 文件路径
+// pkg 环境下使用可执行文件所在目录或当前工作目录
+function getEnvPath() {
+  if (isPkg) {
+    // pkg 环境：优先使用可执行文件旁边的 .env
+    const exeDir = path.dirname(process.execPath);
+    const exeEnvPath = path.join(exeDir, '.env');
+    if (fs.existsSync(exeEnvPath)) {
+      return exeEnvPath;
+    }
+    // 其次使用当前工作目录的 .env
+    const cwdEnvPath = path.join(process.cwd(), '.env');
+    if (fs.existsSync(cwdEnvPath)) {
+      return cwdEnvPath;
+    }
+    // 返回可执行文件目录的路径（即使不存在）
+    return exeEnvPath;
+  }
+  // 开发环境
+  return path.join(__dirname, '../../.env');
+}
+
+const envPath = getEnvPath();
 
 const router = express.Router();
 
@@ -83,72 +109,13 @@ router.post('/oauth/exchange', authMiddleware, async (req, res) => {
   }
   
   try {
-    const postData = new URLSearchParams({
-      code,
-      client_id: OAUTH_CONFIG.CLIENT_ID,
-      client_secret: OAUTH_CONFIG.CLIENT_SECRET,
-      redirect_uri: `http://localhost:${port}/oauth-callback`,
-      grant_type: 'authorization_code'
-    });
-    
-    const response = await fetch(OAUTH_CONFIG.TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: postData.toString()
-    });
-    
-    const tokenData = await response.json();
-    
-    if (!tokenData.access_token) {
-      return res.status(400).json({ success: false, message: 'Token exchange failed' });
-    }
-    
-    const account = {
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_in: tokenData.expires_in,
-      timestamp: Date.now(),
-      enable: true
-    };
-    
-    try {
-      const emailResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-          'Host': 'www.googleapis.com',
-          'User-Agent': 'Go-http-client/1.1',
-          'Authorization': `Bearer ${account.access_token}`,
-          'Accept-Encoding': 'gzip'
-        }
-      });
-      const userInfo = await emailResponse.json();
-      if (userInfo.email) {
-        account.email = userInfo.email;
-        logger.info('Got user email: ' + userInfo.email);
-      }
-    } catch (err) {
-      logger.warn('Failed to get user email:', err.message);
-    }
-    
-    if (config.skipProjectIdFetch) {
-      account.projectId = generateProjectId();
-      logger.info('Using randomly generated projectId: ' + account.projectId);
-    } else {
-      try {
-        const projectId = await tokenManager.fetchProjectId(account);
-        if (projectId === undefined) {
-          return res.status(400).json({ success: false, message: 'Account ineligible (cannot access projectId)' });
-        }
-        account.projectId = projectId;
-        logger.info('Account verified, projectId: ' + projectId);
-      } catch (error) {
-        logger.error('Failed to verify account eligibility:', error.message);
-        return res.status(500).json({ success: false, message: 'Failed to verify account eligibility: ' + error.message });
-      }
-    }
-    
-    res.json({ success: true, data: account });
+    const account = await oauthManager.authenticate(code, port);
+    const message = account.hasQuota 
+      ? 'Token添加成功' 
+      : 'Token添加成功（该账号无资格，已自动使用随机ProjectId）';
+    res.json({ success: true, data: account, message, fallbackMode: !account.hasQuota });
   } catch (error) {
-    logger.error('Token exchange failed:', error.message);
+    logger.error('认证失败:', error.message);
     res.status(500).json({ success: false, message: error.message });
   }
 });
@@ -170,15 +137,8 @@ router.put('/config', authMiddleware, (req, res) => {
   try {
     const { env: envUpdates, json: jsonUpdates } = req.body;
     
-    if (envUpdates) {
-      updateEnvFile(envPath, envUpdates);
-    }
-    
-    if (jsonUpdates) {
-      const currentConfig = getConfigJson();
-      const mergedConfig = deepMerge(currentConfig, jsonUpdates);
-      saveConfigJson(mergedConfig);
-    }
+    if (envUpdates) updateEnvFile(envPath, envUpdates);
+    if (jsonUpdates) saveConfigJson(deepMerge(getConfigJson(), jsonUpdates));
     
     dotenv.config({ override: true });
     reloadConfig();
@@ -191,7 +151,53 @@ router.put('/config', authMiddleware, (req, res) => {
   }
 });
 
-// Get Model Quota for specific Token
+// 获取轮询策略配置
+router.get('/rotation', authMiddleware, (req, res) => {
+  try {
+    const rotationConfig = tokenManager.getRotationConfig();
+    res.json({ success: true, data: rotationConfig });
+  } catch (error) {
+    logger.error('获取轮询配置失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 更新轮询策略配置
+router.put('/rotation', authMiddleware, (req, res) => {
+  try {
+    const { strategy, requestCount } = req.body;
+    
+    // 验证策略值
+    const validStrategies = ['round_robin', 'quota_exhausted', 'request_count'];
+    if (strategy && !validStrategies.includes(strategy)) {
+      return res.status(400).json({
+        success: false,
+        message: `无效的策略，可选值: ${validStrategies.join(', ')}`
+      });
+    }
+    
+    // 更新内存中的配置
+    tokenManager.updateRotationConfig(strategy, requestCount);
+    
+    // 保存到config.json
+    const currentConfig = getConfigJson();
+    if (!currentConfig.rotation) currentConfig.rotation = {};
+    if (strategy) currentConfig.rotation.strategy = strategy;
+    if (requestCount) currentConfig.rotation.requestCount = requestCount;
+    saveConfigJson(currentConfig);
+    
+    // 重载配置到内存
+    reloadConfig();
+    
+    logger.info(`轮询策略已更新: ${strategy || '未变'}, 请求次数: ${requestCount || '未变'}`);
+    res.json({ success: true, message: '轮询策略已更新', data: tokenManager.getRotationConfig() });
+  } catch (error) {
+    logger.error('更新轮询配置失败:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// 获取指定Token的模型额度
 router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
   try {
     const { refreshToken } = req.params;
@@ -208,8 +214,9 @@ router.get('/tokens/:refreshToken/quotas', authMiddleware, async (req, res) => {
       try {
         tokenData = await tokenManager.refreshToken(tokenData);
       } catch (error) {
-        logger.error('Failed to refresh token:', error.message);
-        return res.status(401).json({ success: false, message: 'Token expired and refresh failed' });
+        logger.error('刷新token失败:', error.message);
+        // 使用 400 而不是 401，避免前端误认为 JWT 登录过期
+        return res.status(400).json({ success: false, message: 'Google Token已过期且刷新失败，请重新登录Google账号' });
       }
     }
     

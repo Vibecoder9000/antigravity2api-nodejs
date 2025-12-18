@@ -3,14 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Token Management System</title>
+    <title>Token 管理</title>
+    <!-- 引入 MiSans 字体 -->
+    <link rel="stylesheet" href="https://font.sec.miui.com/font/css?family=MiSans:100,200,300,400,450,500,600,650,700,900:Chinese_Simplify,Latin&display=swap">
+    <!-- 引入 Ubuntu Mono 等宽字体 -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono:wght@400;700&display=swap">
     <link rel="stylesheet" href="style.css">
+    <script>
+        // 页面加载前检查登录状态，避免闪现
+        if (localStorage.getItem('authToken')) {
+            document.documentElement.classList.add('logged-in');
+        }
+    </script>
+    <style>
+        .logged-in #loginForm { display: none !important; }
+        .logged-in #mainContent { display: block !important; }
+    </style>
 </head>
 <body>
     <div class="container">
         <!-- Login Form -->
         <div id="loginForm" class="login-form">
-            <h2>🔐 Token Management System</h2>
+            <h2>Token 管理</h2>
             <form id="login">
                 <div class="form-group">
                     <label>👤 Username</label>
@@ -27,87 +41,216 @@
         <!-- Main Content -->
         <div id="mainContent" class="main-content hidden">
             <div class="header">
-                <div class="tabs">
-                    <button class="tab active" onclick="switchTab('tokens')">🎯 Tokens</button>
-                    <button class="tab" onclick="switchTab('settings')">⚙️ Settings</button>
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('tokens')">🎯 Token</button>
+                <button class="tab" onclick="switchTab('settings')">⚙️ 设置</button>
+            </div>
+                <div class="header-right">
+                    <span class="server-info" id="serverInfo"></span>
+                    <button onclick="logout()">🚪 退出</button>
                 </div>
-                <button onclick="logout()">🚪 Logout</button>
             </div>
             <div class="content">
                 <!-- Token Management Page -->
                 <div id="tokensPage">
-                <!-- Stats Cards -->
-                <div class="stats">
-                    <div class="stat-card">
-                        <div class="stat-value" id="totalTokens">0</div>
-                        <div class="stat-label">Total Tokens</div>
+                    <!-- 统计卡片 + 操作按钮 合并 -->
+                    <div class="top-bar">
+                        <div class="stats-inline">
+                            <div class="stat-item">
+                                <span class="stat-num" id="totalTokens">0</span>
+                                <span class="stat-text">总数</span>
+                            </div>
+                            <div class="stat-item success">
+                                <span class="stat-num" id="enabledTokens">0</span>
+                                <span class="stat-text">启用</span>
+                            </div>
+                            <div class="stat-item danger">
+                                <span class="stat-num" id="disabledTokens">0</span>
+                                <span class="stat-text">禁用</span>
+                            </div>
+                        </div>
+                        <div class="action-btns">
+                            <button type="button" onclick="showOAuthModal()" class="btn btn-success btn-sm">🔐 OAuth</button>
+                            <button type="button" onclick="showManualModal()" class="btn btn-secondary btn-sm">✏️ 手动</button>
+                            <button type="button" onclick="loadTokens()" class="btn btn-warning btn-sm">🔄 刷新</button>
+                            <button type="button" onclick="toggleSensitiveInfo()" class="btn btn-sm" id="toggleSensitiveBtn" title="隐藏/显示敏感信息">👁️ 显示</button>
+                        </div>
                     </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, var(--success), #059669);">
-                        <div class="stat-value" id="enabledTokens">0</div>
-                        <div class="stat-label">Enabled</div>
-                    </div>
-                    <div class="stat-card" style="background: linear-gradient(135deg, var(--danger), #dc2626);">
-                        <div class="stat-value" id="disabledTokens">0</div>
-                        <div class="stat-label">Disabled</div>
+
+                    <!-- Token网格 -->
+                    <div id="tokenList" class="token-grid">
+                        <div class="empty-state">
+                            <div class="empty-state-icon">📦</div>
+                            <div class="empty-state-text">暂无Token</div>
+                            <div class="empty-state-hint">点击上方OAuth按钮添加Token</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Add Token Button Group -->
-                <div class="add-form">
-                    <h3>➕ Add New Token<span class="help-tip" title="Supports OAuth Login or Manual Entry">?</span></h3>
-                    <div class="btn-group">
-                        <button type="button" onclick="showOAuthModal()" class="btn btn-success">🔐 OAuth Login</button>
-                        <button type="button" onclick="showManualModal()" class="btn btn-secondary">✏️ Manual Entry</button>
-                        <button type="button" onclick="loadTokens()" class="btn btn-warning">🔄 Refresh</button>
-                    </div>
-                </div>
-
-                <!-- Token Grid -->
-                <div id="tokenList" class="token-grid">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📦</div>
-                        <div class="empty-state-text">No Tokens</div>
-                        <div class="empty-state-hint">Click the buttons above to add your first Token</div>
-                    </div>
-                </div>
-                </div>
-
-                <!-- Settings Page -->
+                <!-- 设置页面 -->
                 <div id="settingsPage" class="hidden">
-                    <h3>⚙️ System Config</h3>
                     <form id="configForm" class="config-form">
-                        <div class="config-section">
-                            <h4>Server Config</h4>
-                            <div class="form-group"><label>PORT</label><input type="number" name="PORT"></div>
-                            <div class="form-group"><label>HOST</label><input type="text" name="HOST"></div>
+                        <div class="config-grid">
+                            <!-- 服务器配置 -->
+                            <div class="config-section">
+                                <h4>🖥️ 服务器</h4>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>端口</label>
+                                        <input type="number" name="PORT" placeholder="8045">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>监听地址</label>
+                                        <input type="text" name="HOST" placeholder="0.0.0.0">
+                                    </div>
+                                </div>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>最大请求大小</label>
+                                        <input type="text" name="MAX_REQUEST_SIZE" placeholder="500mb">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>API密钥</label>
+                                        <input type="password" name="API_KEY" placeholder="留空则不验证">
+                                    </div>
+                                </div>
+                                <div class="form-row-inline switch-row">
+                                    <div class="form-group compact switch-group">
+                                        <label>跳过验证 <span class="help-tip" data-tooltip="跳过ProjectId获取，直接随机生成（仅Pro账号）">?</span></label>
+                                        <label class="switch">
+                                            <input type="checkbox" name="SKIP_PROJECT_ID_FETCH">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <div class="form-group compact switch-group">
+                                        <label>原生Axios <span class="help-tip" data-tooltip="使用原生axios而非TLS指纹请求器">?</span></label>
+                                        <label class="switch">
+                                            <input type="checkbox" name="USE_NATIVE_AXIOS">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group compact">
+                                    <label>图片访问链接</label>
+                                    <input type="text" name="IMAGE_BASE_URL" placeholder="https://your-domain.zeabur.app">
+                                </div>
+                                <div class="form-group compact">
+                                    <label>代理地址</label>
+                                    <input type="text" name="PROXY" placeholder="http://127.0.0.1:7890">
+                                </div>
+                            </div>
+
+                            <!-- 模型默认参数 -->
+                            <div class="config-section">
+                                <h4>🎛️ 模型参数</h4>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>温度</label>
+                                        <input type="number" step="0.1" name="DEFAULT_TEMPERATURE" placeholder="1">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>Top P</label>
+                                        <input type="number" step="0.01" name="DEFAULT_TOP_P" placeholder="1">
+                                    </div>
+                                </div>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>Top K</label>
+                                        <input type="number" name="DEFAULT_TOP_K" placeholder="50">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>最大Token</label>
+                                        <input type="number" name="DEFAULT_MAX_TOKENS" placeholder="32000">
+                                    </div>
+                                </div>
+                                <div class="form-group compact highlight">
+                                    <label>思考预算 <span class="help-tip" data-tooltip="思考模型的思考token预算，影响推理深度">?</span></label>
+                                    <input type="number" name="DEFAULT_THINKING_BUDGET" placeholder="16000">
+                                </div>
+                                <div class="form-row-inline switch-row">
+                                    <div class="form-group compact switch-group">
+                                        <label>上下文System <span class="help-tip" data-tooltip="合并开头连续的system消息到SystemInstruction">?</span></label>
+                                        <label class="switch">
+                                            <input type="checkbox" name="USE_CONTEXT_SYSTEM_PROMPT">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="form-group compact">
+                                    <label>系统提示词</label>
+                                    <textarea name="SYSTEM_INSTRUCTION" rows="3" placeholder="可选的系统提示词"></textarea>
+                                </div>
+                            </div>
+
+                            <!-- 轮询策略与性能优化 -->
+                            <div class="config-section">
+                                <h4>🔄 轮询与性能</h4>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>策略模式 <span class="help-tip" data-tooltip="均衡负载：每次请求切换Token&#10;额度耗尽：用完额度才切换&#10;自定义次数：指定次数后切换">?</span></label>
+                                        <select name="ROTATION_STRATEGY" id="rotationStrategy" onchange="toggleRequestCountInput()">
+                                            <option value="round_robin">均衡负载</option>
+                                            <option value="quota_exhausted">额度耗尽切换</option>
+                                            <option value="request_count">自定义次数</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group compact" id="requestCountGroup">
+                                        <label>每Token请求次数 <span class="help-tip" data-tooltip="自定义次数模式下，每个Token处理多少次请求后切换">?</span></label>
+                                        <input type="number" name="ROTATION_REQUEST_COUNT" min="1" placeholder="10">
+                                    </div>
+                                </div>
+                                <div class="rotation-status" id="rotationStatus">
+                                    <span class="rotation-label">当前状态:</span>
+                                    <span id="currentRotationInfo">加载中...</span>
+                                </div>
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>超时(ms)</label>
+                                        <input type="number" name="TIMEOUT" placeholder="300000">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>429重试次数</label>
+                                        <input type="number" name="RETRY_TIMES" placeholder="0">
+                                    </div>
+                                </div>
+
+                                <div class="form-row-inline">
+                                    <div class="form-group compact">
+                                        <label>心跳间隔(ms) <span class="help-tip" data-tooltip="SSE心跳间隔，防止CF超时断连">?</span></label>
+                                        <input type="number" name="HEARTBEAT_INTERVAL" placeholder="15000">
+                                    </div>
+                                    <div class="form-group compact">
+                                        <label>内存阈值(MB) <span class="help-tip" data-tooltip="超过此值触发GC清理">?</span></label>
+                                        <input type="number" name="MEMORY_THRESHOLD" placeholder="100">
+                                    </div>
+                                </div>
+                                <div class="form-group compact">
+                                    <label>🔤 界面字体大小 (px)</label>
+                                    <div class="font-size-control">
+                                        <input type="range" id="fontSizeRange" min="10" max="24" value="18" oninput="changeFontSize(this.value)">
+                                        <input type="number" id="fontSizeInput" min="10" max="24" value="18" onchange="changeFontSize(this.value)" style="width: 60px;">
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="config-section">
-                            <h4>Default Params</h4>
-                            <div class="form-group"><label>TEMPERATURE</label><input type="number" step="0.1" name="DEFAULT_TEMPERATURE"></div>
-                            <div class="form-group"><label>Top P</label><input type="number" step="0.01" name="DEFAULT_TOP_P"></div>
-                            <div class="form-group"><label>Top K</label><input type="number" name="DEFAULT_TOP_K"></div>
-                            <div class="form-group"><label>Max Tokens</label><input type="number" name="DEFAULT_MAX_TOKENS"></div>
+                        <div class="config-actions">
+                            <button type="submit" class="btn btn-success">💾 保存配置</button>
+                            <button type="button" onclick="loadConfig()" class="btn btn-secondary">🔄 重新加载</button>
                         </div>
-                        <div class="config-section">
-                            <h4>Security Config</h4>
-                            <div class="form-group"><label>API Key</label><input type="text" name="API_KEY"></div>
-                            <div class="form-group"><label>Max Request Size</label><input type="text" name="MAX_REQUEST_SIZE"></div>
-                        </div>
-                        <div class="config-section">
-                            <h4>Other Config</h4>
-                            <div class="form-group"><label>Timeout (ms)</label><input type="number" name="TIMEOUT"></div>
-                            <div class="form-group"><label>Proxy URL</label><input type="text" name="PROXY" placeholder="http://127.0.0.1:7897"></div>
-                            <div class="form-group"><label>Skip ProjectId Fetch</label><select name="SKIP_PROJECT_ID_FETCH"><option value="false">No</option><option value="true">Yes</option></select></div>
-                            <div class="form-group"><label>System Prompt</label><textarea name="SYSTEM_INSTRUCTION" rows="3"></textarea></div>
-                        </div>
-                        <button type="submit" class="btn btn-success">💾 Save Config</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- 按依赖顺序加载模块 -->
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/quota.js"></script>
+    <script src="js/tokens.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>
 
