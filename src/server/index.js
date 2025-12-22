@@ -311,11 +311,8 @@ app.post('/v1/chat/completions', async (req, res) => {
 
       try {
         if (isImageModel) {
-          const { content, usage } = await with429Retry(
-            () => generateAssistantResponseNoStream(requestBody, token),
-            safeRetries,
-            'chat.stream.image '
-          );
+          // No retry for image model - 429 means quota exhausted, retrying immediately won't help
+          const { content, usage } = await generateAssistantResponseNoStream(requestBody, token);
           writeStreamData(res, createStreamChunk(id, created, model, { content }));
           writeStreamData(res, { ...createStreamChunk(id, created, model, {}, 'stop'), usage });
         } else {

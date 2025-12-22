@@ -22,7 +22,7 @@
     "topP": 1,
     "topK": 50,
     "maxTokens": 32000,
-    "thinkingBudget": 16000
+    "thinkingBudget": 4092
   },
   "cache": {
     "modelListTTL": 3600000

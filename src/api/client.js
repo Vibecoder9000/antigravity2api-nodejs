@@ -321,6 +321,7 @@ function parseAndEmitStreamChunk(line, state, callback) {
 // ==================== Exported Functions ====================
 
 export async function generateAssistantResponse(requestBody, token, callback) {
+  const headers = buildHeaders(token);
   
   // 在 state 中临时缓存思维链签名，供流式多片段复用，并携带 session 与 model 信息以写入全局缓存
   const state = {
