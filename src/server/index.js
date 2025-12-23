@@ -293,7 +293,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     quotaManager.recordRequest(token.refresh_token, model);
     
     const isImageModel = model.includes('-image');
-    const requestBody = generateRequestBody(messages, model, params, tools, token);
+    const requestBody = await generateRequestBody(messages, model, params, tools, token);
     if (isImageModel) {
       prepareImageRequest(requestBody);
     }

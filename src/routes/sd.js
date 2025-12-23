@@ -69,9 +69,9 @@ const SD_MOCK_DATA = {
 };
 
 // Build Image Generation Request Body
-function buildImageRequestBody(prompt, token) {
+async function buildImageRequestBody(prompt, token) {
   const messages = [{ role: 'user', content: prompt }];
-  const requestBody = generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token);
+  const requestBody = await generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token);
   return prepareImageRequest(requestBody);
 }
 
@@ -137,7 +137,7 @@ router.post('/img2img', async (req, res) => {
     
     const messages = [{ role: 'user', content }];
     const requestBody = prepareImageRequest(
-      generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token)
+      await generateRequestBody(messages, 'gemini-3-pro-image', {}, null, token)
     );
     
     const images = await generateImageForSD(requestBody, token);
@@ -170,7 +170,7 @@ router.post('/txt2img', async (req, res) => {
       throw new Error('No available token');
     }
     
-    const requestBody = buildImageRequestBody(prompt, token);
+    const requestBody = await buildImageRequestBody(prompt, token);
     const images = await generateImageForSD(requestBody, token);
     
     if (images.length === 0) {

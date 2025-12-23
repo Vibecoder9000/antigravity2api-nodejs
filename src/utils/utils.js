@@ -4,6 +4,7 @@ import { generateRequestId } from './idGenerator.js';
 import os from 'os';
 import { getReasoningSignature, getToolSignature } from './thoughtSignatureCache.js';
 import { setToolNameMapping } from './toolNameCache.js';
+import { compressImage } from './imageProcessor.js';
 
 // 思维链签名常量
 // Claude 模型签名
@@ -23,7 +24,7 @@ function getThoughtSignatureForModel(actualModelName) {
   return DEFAULT_THOUGHT_SIGNATURE;
 }
 
-function extractImagesFromContent(content) {
+async function extractImagesFromContent(content) {
   const result = { text: '', images: [] };
 
   // 如果content是字符串，直接返回
@@ -34,6 +35,8 @@ function extractImagesFromContent(content) {
 
   // 如果content是数组（multimodal格式）
   if (Array.isArray(content)) {
+    const imagePromises = [];
+    
     for (const item of content) {
       if (item.type === 'text') {
         result.text += item.text;
@@ -46,29 +49,50 @@ function extractImagesFromContent(content) {
         if (match) {
           const format = match[1]; // 例如 png, jpeg, jpg
           const base64Data = match[2];
-          result.images.push({
-            inlineData: {
-              mimeType: `image/${format}`,
-              data: base64Data
-            }
-          })
+          
+          // Queue image for async compression
+          imagePromises.push(
+            compressImage(base64Data, `image/${format}`)
+              .then(compressed => ({
+                inlineData: {
+                  mimeType: compressed.mimeType,
+                  data: compressed.data
+                }
+              }))
+          );
         }
       }
+    }
+    
+    // Wait for all image compressions to complete
+    if (imagePromises.length > 0) {
+      const compressedImages = await Promise.all(imagePromises);
+      result.images.push(...compressedImages);
     }
   }
 
   return result;
 }
 function handleUserMessage(extracted, antigravityMessages){
+  const parts = [];
+  
+  // Only add text part if it's non-empty
+  if (extracted.text && extracted.text.trim() !== '') {
+    parts.push({ text: extracted.text });
+  }
+  
+  // Add images
+  parts.push(...extracted.images);
+  
+  // If we have no parts at all (empty message), add a minimal text to avoid empty content
+  if (parts.length === 0) {
+    parts.push({ text: ' ' });
+  }
+  
   antigravityMessages.push({
     role: "user",
-    parts: [
-      {
-        text: extracted.text
-      },
-      ...extracted.images
-    ]
-  })
+    parts
+  });
 }
 // 将工具名称规范为 Vertex 要求的格式：^[a-zA-Z0-9_-]{1,128}$
 function sanitizeToolName(name) {
@@ -202,12 +226,12 @@ function handleToolCall(message, antigravityMessages){
     });
   }
 }
-function openaiMessageToAntigravity(openaiMessages, enableThinking, actualModelName, sessionId){
+async function openaiMessageToAntigravity(openaiMessages, enableThinking, actualModelName, sessionId){
   const antigravityMessages = [];
   for (const message of openaiMessages) {
     if (message.role === "user" || message.role === "system") {
       // system 消息作为 user 处理（开头的 system 已在 generateRequestBody 中过滤）
-      const extracted = extractImagesFromContent(message.content);
+      const extracted = await extractImagesFromContent(message.content);
       handleUserMessage(extracted, antigravityMessages);
     } else if (message.role === "assistant") {
       handleAssistantMessage(message, antigravityMessages, enableThinking, actualModelName, sessionId);
@@ -397,7 +421,7 @@ function isEnableThinking(modelName){
     modelName === "gpt-oss-120b-medium";
 }
 
-function generateRequestBody(openaiMessages,modelName,parameters,openaiTools,token){
+async function generateRequestBody(openaiMessages,modelName,parameters,openaiTools,token){
   
   const enableThinking = isEnableThinking(modelName);
   const actualModelName = modelMapping(modelName);
@@ -423,7 +447,7 @@ function generateRequestBody(openaiMessages,modelName,parameters,openaiTools,tok
     project: token.projectId,
     requestId: generateRequestId(),
     request: {
-      contents: openaiMessageToAntigravity(filteredMessages, enableThinking, actualModelName, token.sessionId),
+      contents: await openaiMessageToAntigravity(filteredMessages, enableThinking, actualModelName, token.sessionId),
       tools: convertOpenAIToolsToAntigravity(openaiTools, token.sessionId, actualModelName),
       toolConfig: {
         functionCallingConfig: {

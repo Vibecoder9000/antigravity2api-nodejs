@@ -7,6 +7,7 @@ import { generateSessionId, generateProjectId } from '../utils/idGenerator.js';
 import config, { getConfigJson } from '../config/config.js';
 import { OAUTH_CONFIG } from '../constants/oauth.js';
 import { buildAxiosRequestConfig } from '../utils/httpClient.js';
+import AntigravityRequester from '../AntigravityRequester.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -67,6 +68,16 @@ class TokenManager {
     this.requestCountPerToken = 50;  // request_count 策略下每个token请求次数后切换
     this.tokenRequestCounts = new Map();  // 记录每个token的请求次数
     
+    // Initialize requester if not using native axios
+    this.requester = null;
+    if (!config.useNativeAxios) {
+      try {
+        this.requester = new AntigravityRequester();
+      } catch (error) {
+        log.warn('AntigravityRequester in TokenManager initialization failed, fallback to axios:', error.message);
+      }
+    }
+
     this.ensureFileExists();
     this.initialize();
   }
@@ -148,19 +159,49 @@ class TokenManager {
   }
 
   async fetchProjectId(token) {
-    const response = await axios(buildAxiosRequestConfig({
-      method: 'POST',
-      url: 'https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist',
-      headers: {
-        'Host': 'daily-cloudcode-pa.sandbox.googleapis.com',
-        'User-Agent': 'antigravity/1.11.9 windows/amd64',
-        'Authorization': `Bearer ${token.access_token}`,
-        'Content-Type': 'application/json',
-        'Accept-Encoding': 'gzip'
-      },
-      data: JSON.stringify({ metadata: { ideType: 'ANTIGRAVITY' } })
-    }));
-    return response.data?.cloudaicompanionProject;
+    const url = 'https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:loadCodeAssist';
+    const headers = {
+      'Host': 'daily-cloudcode-pa.sandbox.googleapis.com',
+      'User-Agent': config.api.userAgent || 'antigravity/1.11.9 windows/amd64',
+      'Authorization': `Bearer ${token.access_token}`,
+      'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip'
+    };
+    const data = { metadata: { ideType: 'ANTIGRAVITY' } };
+
+    try {
+      if (this.requester) {
+        const response = await this.requester.antigravity_fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+          proxy: config.proxy,
+          timeout: config.timeout // Align with axios timeout
+        });
+        
+        if (!response.ok) {
+           // Fallback or throw? consistent with axios behavior which throws on non-2xx usually
+           // But here we just return undefined on failure in existing logic?
+           // Original code: await axios(...) throws on 4xx/5xx by default.
+           // So we should parse error.
+           const errorText = await response.text();
+           throw new Error(`Request failed with status ${response.status}: ${errorText}`);
+        }
+        const json = await response.json();
+        return json?.cloudaicompanionProject;
+      } else {
+        const response = await axios(buildAxiosRequestConfig({
+          method: 'POST',
+          url,
+          headers,
+          data: JSON.stringify(data)
+        }));
+        return response.data?.cloudaicompanionProject;
+      }
+    } catch (error) {
+       // Original code let errors propagate to getToken's try/catch
+       throw error;
+    }
   }
 
   isExpired(token) {
@@ -179,20 +220,48 @@ class TokenManager {
     });
 
     try {
-      const response = await axios(buildAxiosRequestConfig({
-        method: 'POST',
-        url: OAUTH_CONFIG.TOKEN_URL,
-        headers: {
-          'Host': 'oauth2.googleapis.com',
-          'User-Agent': 'Go-http-client/1.1',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Accept-Encoding': 'gzip'
-        },
-        data: body.toString()
-      }));
+      let responseData;
+      
+      if (this.requester) {
+        const response = await this.requester.antigravity_fetch(OAUTH_CONFIG.TOKEN_URL, {
+          method: 'POST',
+          headers: {
+            'Host': 'oauth2.googleapis.com',
+            'User-Agent': 'Go-http-client/1.1',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept-Encoding': 'gzip'
+          },
+          body: body.toString(),
+          proxy: config.proxy,
+          timeout: config.timeout
+        });
 
-      token.access_token = response.data.access_token;
-      token.expires_in = response.data.expires_in;
+        if (!response.ok) {
+           const errorText = await response.text();
+           // Construct error object similar to axios error for consistency in catch block if needed, 
+           // though existing catch block handles generic messages.
+           const error = new Error(errorText);
+           error.response = { status: response.status, data: errorText };
+           throw error;
+        }
+        responseData = await response.json();
+      } else {
+        const response = await axios(buildAxiosRequestConfig({
+          method: 'POST',
+          url: OAUTH_CONFIG.TOKEN_URL,
+          headers: {
+            'Host': 'oauth2.googleapis.com',
+            'User-Agent': 'Go-http-client/1.1',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept-Encoding': 'gzip'
+          },
+          data: body.toString()
+        }));
+        responseData = response.data;
+      }
+
+      token.access_token = responseData.access_token;
+      token.expires_in = responseData.expires_in;
       token.timestamp = Date.now();
       this.saveToFile(token);
       return token;
